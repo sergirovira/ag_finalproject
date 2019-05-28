@@ -1,0 +1,214 @@
+/////////////////////////////////////////////////////////////////
+version="1.0";
+info="
+	LIBRARY: pcurves.lib
+	AUTHOR: Sergi Rovira
+	PROCEDURES:
+		param_by_lines(poly F, poly p) computes a rational parametrization of an irreducible 
+
+		projective curve C of degree d > 0, having a (d-1)-fold point p.
+		
+		compute_singularities(poly f) computes singularities of an irreducible projective curve f.
+		
+		compute_adjoint_ideal(poly f,list L) computes the defining polynomial of the (deg(f) - 2)-adjoint ideal of f.
+
+		compute_resultants(poly f, poly h) computes the resultant of two polynomials defined over Q.
+
+		compute_pp(poly rx, poly ry) computes the primitive part of two polynomials defined over Q[x,y,z][t] with respect to t.
+
+";
+
+/////////////////////////////////////////////////////////////////
+LIB "inout.lib";
+LIB "solve.lib"
+/////////////////////////////////////////////////////////////////
+
+
+
+proc param_by_lines(poly F, poly p)
+"USAGE: param_by_lines(F,p); F polynomial in the complex ring C[x,y,z].
+RETURN: ideal I with the three polynomials defining the rational parametrization of F.
+EXAMPLE: example param_by_lines; shows an example
+"
+{
+
+	def orig = basering;
+
+	int d = deg(F);
+	
+	def c1 = subst(p,x,1,y,0,z,0);
+	def c2 = subst(p,x,0,y,1,z,0);
+	def c3 = subst(p,x,0,y,0,z,1);
+
+	poly g = subst(F,x,x+c1,y,y+c2,z,1);
+
+	poly g1 = g - jet(g,d-1);
+	poly g2 = g - g1 - jet(g,d-2);
+
+	poly g1_red = subst(g1,x,1,y,z);
+	poly g2_red = subst(g2,x,1,y,z);
+
+	poly r1 = -g2_red + c1*g1_red;
+	poly r2 = -z*g2_red + c2*g1_red;
+
+	ideal I = r1,r2,g1_red;
+
+	return(I);
+
+}
+
+
+example
+{ "EXAMPLE:"; echo = 2;
+ring r=(complex),(x,y,z),lp;
+poly f = 1 + x - 15*x2 - 29*y2 + 30*y3 - 25*xy2 + x3y + 35*xy + x4 -6*y4 + 6*x2y;
+poly F = homog(f,z);
+poly p = x + y + z;
+param_by_lines(F,p);
+}
+
+proc compute_singularities(poly f)
+"USAGE: compute_singularities(f); f a polynomial in C[x,y,z].
+RETURN: list, with the singularities (as lists) of f.
+NOTE: Not always outputs the total number of singular points. It does
+not find singular points at infinity.
+EXAMPLE: example compute_singularities; shows an example
+"
+{
+		def oldring = basering;
+		poly p = subst(f,z,1);
+		ring r = (complex),(x,y),lp;
+		setring r;
+		poly p1 = fetch(oldring,p);
+		ideal I = p1,jacob(p1);
+		def T = solve(I,30,1,"nodisplay");
+		setring oldring;
+		list L = fetch(T,SOL);
+		return(L);
+
+}
+
+example
+{ "EXAMPLE:"; echo = 2;
+ring r=(complex),(x,y,z),lp;
+poly f = -2*xy2z - 48*x2z2 + 4xyz2 - 2x3z + x3y - 6y4 + 48y2z2 + 6x4;
+compute_singularities(f);
+}
+
+
+proc compute_adjoint_ideal(poly f,list L)
+"USAGE: compute_adjoint_ideal(f,L); f polynomial defining a rational irreducible
+projective curve. L list of ordinary singular points (given as polynomials).
+RETURN: ring, with 9 variables over the complex field. It contains a polynomial H defining 
+the (deg(f) - 2)-adjoint ideal of f.
+NOTE: The algorithm only works when d = 4 and when all the singularities are double.
+EXAMPLE: example compute_adjoint_ideal; shows an example
+"
+{
+		def oldring = basering;
+
+		int d = deg(f);
+		int l = size(L);
+		def old_L = L;
+
+		if(d - 2 == 2){
+			ring r = (complex),(a(1..6),x,y,z),lp;
+			setring r;
+			
+			list L_new = fetch(oldring,old_L);
+
+			poly h = a(1)*x2 + a(2)*y2 + a(3)*z2 + a(4)*xy + a(5)*xz + a(6)*yz;
+			ideal I = h;
+			poly p;
+			def c1; def c2; def c3;
+
+			for(int j = 1; j <= l; j = j+1){
+				p = L_new[j];
+
+				c1 = subst(p,a(1),1,a(2),0,a(3),0);
+				c2 = subst(p,a(1),0,a(2),1,a(3),0);
+				c3 = subst(p,a(1),0,a(2),0,a(3),1);
+
+				I = I + subst(h,x,c1,y,c2,z,c3);
+			}
+			ideal si = std(I);
+			poly H = si[1];
+			export H;
+			return(r);
+		}
+}
+
+example
+{ "EXAMPLE:"; echo = 2;
+
+ring r=(complex),(x,y,z),lp;
+poly f = (x2 + 4y + y2)^2 - 16*(x2 + y2);
+poly F = homog(f,z);
+
+poly p1 = z;
+poly p2 = x + i*y;
+poly p3 = x - i*y;
+poly p4 = -8*y + z;
+
+list L = p1,p2,p3,p4;
+
+def T = compute_adjoint_ideal(F,L);
+setring T;
+H;
+
+}
+
+proc compute_resultants(poly f, poly h)
+"USAGE: compute_resultants(f,h); f,h polynomials in Q[x,y,t].
+RETURN: ideal, with the resultants with respect to x and y of f and h.
+EXAMPLE: example compute_resultants; shows an example
+"
+{
+
+	poly res_x = resultant(f,h,x);
+	poly res_y = resultant(f,h,y);
+
+	ideal I = res_x,res_y;
+
+	return(I);
+}
+
+example
+{ "EXAMPLE:"; echo = 2;
+
+ring r=0,(x,y,t),lp;
+
+poly f = (x2 + 4y + y2)^2 - 16*(x2 + y2);
+poly h = t*x2 + t*y2 + x + 8*ty;
+
+compute_resultants(f,h);
+
+}
+
+
+proc compute_pp(poly rx, poly ry)
+"USAGE: compute_pp(rx,ry); rx,ry two polynomials in (Q[x,y])[t].
+RETURN: ideal with the primitive part with respect to t with of rx and ry.
+EXAMPLE: example compute_pp; shows an example
+"
+{
+
+	poly ppt_rx = cleardenom(rx);
+	poly ppt_ry = cleardenom(ry);
+
+	ideal I = ppt_rx, ppt_ry;
+
+	return(I);
+}
+
+example
+{ "EXAMPLE:"; echo = 2;
+
+ring r=(0,x,y),t,lp;
+
+poly rx = 256y4t4+32y4t2+y4+4096y3t4+128y3t2+8y3+16384y2t4-1024y2t2;
+poly ry = 256x4t4+32x4t2+x4+1024x3t3;
+
+compute_pp(rx,ry);
+
+}
