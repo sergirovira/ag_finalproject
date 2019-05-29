@@ -23,6 +23,7 @@ LIB "inout.lib";
 LIB "solve.lib"
 /////////////////////////////////////////////////////////////////
 
+"TODO: Compute resultant by subresultants algorithm manualy"
 
 
 proc param_by_lines(poly F, poly p)
